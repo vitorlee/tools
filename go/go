@@ -1,0 +1,109 @@
+#! /bin/sh
+
+##################################################################
+# 快捷登录线上机器
+##################################################################
+
+# 你的名字，用于登录到跳板机
+username="root"
+
+# 默认以这个账户登录到线上机器
+default_user="root"
+
+# 定义机器的快捷方式
+server_list=(
+#----------------------------------------------------------------------------------------------------
+#   "快捷方式        机器名/IP         是否需要跳板机（默认是1:需要）    用什么权限登录（默认是:$default_user）"
+#----------------------------------------------------------------------------------------------------
+    "dev            app-dev"
+    "test            app-test"
+    #"lgc           192.168.1.1             0                             root"
+)
+
+# 使用帮助
+help(){
+    echo "
+    远程登录工具：version 1.0
+    使用方法：
+        【1】：go 机器名 [登录账号]
+
+            用法1：
+                默认以default_user权限登录dev ----> go dev
+            用法2：
+                以username权限登录dev ----> go dev root
+
+        【2】：查看所有机器快捷方式：
+            go -l
+        \n"
+    exit 1
+}
+
+# 查看所有快捷方式
+show_list() {
+    echo "\n选择服务器，如：go dev\n"
+    echo "+------------------------------------------------------------------------------+"
+    for (( i=0;i<${#server_list[*]};i=i+5 ));do
+        A=`echo ${server_list[$i+0]} | awk '{print $1}'`
+        B=`echo ${server_list[$i+1]} | awk '{print $1}'`
+        C=`echo ${server_list[$i+2]} | awk '{print $1}'`
+        D=`echo ${server_list[$i+3]} | awk '{print $1}'`
+        E=`echo ${server_list[$i+4]} | awk '{print $1}'`
+
+        # 格式化输出
+        printf "%-1s %-13s %-1s %-13s %-1s %-13s %-1s %-13s %-1s %-12s %-1s\n" \
+                \| ${A:-' '} \| ${B:-' '} \| ${C:-' '} \| ${D:-' '} \| ${E:-' '} \|
+    done
+    echo "+------------------------------------------------------------------------------+\n"
+}
+
+# 远程登录
+remote_login(){
+
+    # 默认的目标机器是$1
+    host=$1
+
+    # 跳板机
+    proxy="@1.1.1.1 -t ssh "
+
+    # 如果指定了第二参数，则表示指定的账户登录
+    if [ "$2" != "" ];then
+        default_user=$2
+    fi
+
+    # 从server_list里查询是否有预定的快捷方式
+    for key in ${!server_list[*]} ; do
+        A=`echo ${server_list[$key]} | awk '{print $1}'`    # 快捷方式
+        B=`echo ${server_list[$key]} | awk '{print $2}'`    # 机器名/IP
+        C=`echo ${server_list[$key]} | awk '{print $3}'`    # 是否需要通过跳板机登录
+        D=`echo ${server_list[$key]} | awk '{print $4}'`    # 登录用户名
+        if [ "$host" == "$A" ];then
+            host=$B;
+            if [ "$C" == "0" ];then
+                proxy="";
+            fi
+            if [ ! -z $D ];then
+                default_user=""
+                username=$D
+            fi
+            break;
+        fi
+    done
+
+    # 登录目标机器
+    ssh $username$proxy$default_user@$host
+}
+
+
+# 未指定参数，或者参数为 -h | --help，则出现使用帮助
+if [[ "$1" == "" || "$1" == "-h" || "$1" == "--help" ]];then
+    help;
+
+# 查看所有快捷方式
+elif [ "$1" == "-l" ];then
+    show_list;
+
+# 执行登录
+else
+    remote_login $1 $2;
+
+fi
